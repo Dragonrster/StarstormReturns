@@ -1,29 +1,42 @@
-local sprite = Resources.sprite_load(NAMESPACE, "DormantFungus", path.combine(PATH, "Sprites/Items/dormantFungus.png"), 1, 18, 18)
-local sound = Resources.sfx_load(NAMESPACE, "DormantFungus", path.combine(PATH, "Sounds/Items/dormantFungus.ogg"))
+local sprite = Sprite.new("DormantFungus", path.combine(PATH, "Sprites/Items/dormantFungus.png"), 1, 18, 18)
+local sprite_footstep = Sprite.new("DormantFungusFootstep", path.combine(PATH, "Sprites/Items/Effects/dungus.png"), 8, 14, 24)
+local sound = Sound.new("DormantFungus", path.combine(PATH, "Sounds/Items/dormantFungus.ogg"))
 
-local dormantFungus = Item.new(NAMESPACE, "dormantFungus")
-dormantFungus:set_sprite(sprite)
-dormantFungus:set_tier(Item.TIER.common)
-dormantFungus:set_loot_tags(Item.LOOT_TAG.category_healing)
+local dungus = Item.new("dormantFungus")
+dungus:set_sprite(sprite)
+dungus:set_tier(ItemTier.COMMON)
+dungus.loot_tags = Item.LootTag.CATEGORY_HEALING
 
-dormantFungus:clear_callbacks()
-dormantFungus:onPostStep(function(actor, stack)
-	if gm._mod_net_isClient() then return end
+ItemLog.new_from_item(dungus)
 
-	if (math.abs(actor.pHspeed) >= actor.pHmax * 0.98) or actor.pVspeed ~= 0 then
-		local actor_data = actor:get_data()
+Callback.add(Callback.ON_STEP, function()
+	for _, actor in ipairs(dungus:get_holding_actors()) do
+		if Instance.exists(actor) then
+			local stack = actor:item_count(dungus)
+			
+			if (math.abs(actor.pHspeed) >= actor.pHmax * 0.98) or actor.pVspeed ~= 0 then
+				local data = Instance.get_data(actor)
 
-		if not actor_data.dungusTimer then
-			actor_data.dungusTimer = 120
-		end
-		if actor_data.dungusTimer <= 0 then
-			actor_data.dungusTimer = 120
-
-			local regen = math.ceil(actor.maxhp * (1 - 1 / (0.02 * stack + 1)))
-			actor:heal(regen)
-			gm.sound_play_networked(sound, 1, (0.9 + math.random() * 0.2), actor.x, actor.y)
-		else
-			actor_data.dungusTimer = actor_data.dungusTimer - 1
+				if not data.dungusTimer then
+					data.dungusTimer = 120
+				end
+				if data.dungusTimer <= 0 then
+					data.dungusTimer = 120
+					
+					if Net.host then
+						actor:heal(math.ceil(actor.maxhp * (1 - 1 / (0.02 * stack + 1))))
+					end
+					
+					actor:sound_play(sound, 1, 0.9 + math.random() * 0.2)
+					
+					-- copied and pasted from uranium horseshoe basically
+					if actor:is_grounded() then
+						ssr_create_fadeout(actor.x, actor.bbox_bottom + 1, 1, sprite_footstep, 0.25, 0.05)
+					end
+				else
+					data.dungusTimer = data.dungusTimer - 1
+				end
+			end
 		end
 	end
 end)
